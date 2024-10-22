@@ -1,0 +1,788 @@
+---
+title: "Sharp Bounds for Continuous-Valued Treatment Effects with Unobserved Confounders"
+author: "Jean-Baptiste BAITAIRIAN"
+date: "2024-10-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Import libraries
+library(ggplot2)    # For figures
+library(foreach)    # For "for" loops
+library(torch)      # For neural networks
+library(latex2exp)  # For LaTeX expressions
+library(tictoc)     # For computation times
+
+# Import R files
+source("./utils.R")
+```
+
+```{r}
+# Set random seed
+seed <- 1
+set.seed(seed)
+torch_manual_seed(seed)
+```
+
+```{r}
+# Colors for the plots
+our_method_blue <- "#00BFC4"
+our_method_dr_yellow <- "#C9A100"
+jesson_red <- "#F8766D"
+apo_color <- "violetred3"
+```
+
+
+## Simulated dataset
+
+Example of one Monte-Carlo sample with the true APO curve.
+```{r, fig.width = 7.06, fig.height = 5.72}
+# Sample size
+n <- 1000
+
+# Number of confounders
+p_X <- 5
+p_U <- 3
+
+# Correlation between confounders
+rho_X <- 0.3
+rho_U <- 0.3
+corr_XU_prop <- 0.5  # 0.05
+
+beta_X <- rep(0.3, p_X)
+beta_U <- rep(0.2, p_U)
+
+gamma_X <- rep(0.2, p_X)
+gamma_U <- c(rep(0.4, floor(p_U/2)), rep(0.7, p_U-floor(p_U/2)))
+zeta <- -0.3
+
+sd_eps_T <- 0.5
+sd_eps_Y <- 0.3
+
+simu <- simulated_dataset(n=n, p_X=p_X, p_U=p_U,
+                          rho_X=rho_X, rho_U=rho_U,
+                          corr_XU_prop=corr_XU_prop,
+                          beta_X=beta_X, beta_U=beta_U,
+                          gamma_X=gamma_X, gamma_U=gamma_U,
+                          zeta=zeta, sd_eps_T=sd_eps_T, sd_eps_Y=sd_eps_Y)
+
+n.effective <- nrow(simu$data)
+
+grid_t <- seq(min(simu$data$t), max(simu$data$t), 0.1)
+cov_XU <- simu$cov_XU
+Sigma_X <- simu$Sigma_X
+
+X <- subset(simu$data, select=-c(Y, t))
+t <- simu$data$t
+Y <- simu$data$Y
+
+apo_for_plot_fun <- function(t) apo_t(t=t, zeta=zeta,
+                                      gamma_X=gamma_X, gamma_U=gamma_U,
+                                      cov_XU=cov_XU, Sigma_X=Sigma_X)
+
+# Plot simulated data
+# png("images/simul_data.png", units="in", width=7.06, height=5.72, res=400)
+simul.data.plot <- ggplot(data.frame(t=t, Y=Y, apo=apo_for_plot_fun(t))) +
+  geom_point(aes(x=t, y=Y)) +
+  geom_line(aes(x=t, y=apo), col=apo_color, linewidth=1.1) +
+  theme_linedraw() +
+  labs(x=TeX(r"(Treatment or exposition $\tau$)"), y="Outcome Y") +
+  annotate("text", x=2.4, y=3.5, label=TeX(r"($\theta(\tau)$)"), colour=apo_color, size=7, parse=TRUE)
+simul.data.plot
+# dev.off()
+```
+
+### Sensitivity analysis for 5 values of expositions, to compare the proposed methodology to Jesson et al. (2022)
+
+```{r}
+# 1: parallel.computation.jesson (boolean)
+# 2: n.MC (1:infty)
+# 3: data.name ("simul" or "cmr")
+# 4: gamma_est, for cmr data (real number from 1 to 50) 
+# 5: xi.method (NULL or "neural_network")
+# 6: compute.jesson (boolean)
+# 7: doses.length (2:infty)
+# 8: version (1:infty)
+commandArgs <- function(...) c(TRUE, 20, "simul", 1, "NULL", TRUE, 5, 1)
+source("./sens_analys_MC_cmr_and_simu.R")
+```
+
+```{r}
+commandArgs <- function(...) c(FALSE, 20, "simul", 1, "neural_network", FALSE, 5, 2)
+source("./sens_analys_MC_cmr_and_simu.R")
+```
+
+```{r}
+version <- "v1"
+
+qb.mc.bounds <- readRDS(paste0("results/qb_simul_APO_bounds_B_100_", version, ".RData"))
+qb.exec.times <- readRDS(paste0("results/qb_simul_exec_time_B_100_", version, ".RData"))
+qb.cov <- readRDS(paste0("results/qb_simul_cov_B_100_", version, ".RData"))
+
+jesson.mc.bounds <- readRDS(paste0("results/jesson_simul_APO_bounds_B_100_", version, ".RData"))
+jesson.exec.times <- readRDS(paste0("results/jesson_simul_exec_time_B_100_", version, ".RData"))
+jesson.cov <- readRDS(paste0("results/jesson_simul_cov_B_100_", version, ".RData"))
+
+gammas <- readRDS(paste0("results/gammas_simul_", version, ".RData"))
+```
+
+```{r}
+version2 <- "v2"
+
+qb.mc.bounds2 <- readRDS(paste0("results/qb_simul_APO_bounds_B_100_", version2, ".RData"))
+qb.exec.times2 <- readRDS(paste0("results/qb_simul_exec_time_B_100_", version2, ".RData"))
+qb.cov2 <- readRDS(paste0("results/qb_simul_cov_B_100_", version2, ".RData"))
+
+jesson.mc.bounds2 <- readRDS(paste0("results/jesson_simul_APO_bounds_B_100_", version2, ".RData"))
+jesson.exec.times2 <- readRDS(paste0("results/jesson_simul_exec_time_B_100_", version2, ".RData"))
+jesson.cov2 <- readRDS(paste0("results/jesson_simul_cov_B_100_", version2, ".RData"))
+
+gammas2 <- readRDS(paste0("results/gammas_simul_", version2, ".RData"))
+```
+
+```{r}
+n.MC <- length(qb.mc.bounds)
+doses.length <- length(qb.mc.bounds[[1]]$dose) / 2
+quant.order <- 0.99
+
+
+# Compute the mean coverage for each Monte-Carlo sample
+qb.coverage.vec <- rep(NA, n.MC)
+jesson.coverage.vec <- rep(NA, n.MC)
+# the mean CI length
+qb.CI.length.vec <- rep(NA, n.MC)
+jesson.CI.length.vec <- rep(NA, n.MC)
+# and the mean PEI length
+qb.PEI.length.vec <- rep(NA, n.MC)
+jesson.PEI.length.vec <- rep(NA, n.MC)
+
+other.qb.df <- NULL
+other.jesson.df <- NULL
+
+other.qb.df2 <- NULL
+other.jesson.df2 <- NULL
+
+for (i in 1:n.MC) {
+  
+  # For continuous QB
+  qb.mc.bounds.i <- qb.mc.bounds[[i]]
+  qb.mc.bounds.i.ci <- qb.mc.bounds.i[qb.mc.bounds.i$type == "CI", ]
+  qb.mc.bounds.i.pei <- qb.mc.bounds.i[qb.mc.bounds.i$type == "PEI", ]
+  
+  qb.coverage.vec[i] <- mean(qb.mc.bounds.i.ci$lb <= qb.mc.bounds.i.ci$apo & qb.mc.bounds.i.ci$apo <= qb.mc.bounds.i.ci$ub)
+  qb.CI.length.vec[i] <- mean(qb.mc.bounds.i.ci$ub - qb.mc.bounds.i.ci$lb)
+  qb.PEI.length.vec[i] <- mean(qb.mc.bounds.i.pei$ub - qb.mc.bounds.i.pei$lb)
+  
+  qb.mc.bounds.i$MC.ind <- i
+  other.qb.df <- rbind(other.qb.df, qb.mc.bounds.i)
+  
+  qb.mc.bounds.i2 <- qb.mc.bounds2[[i]]
+  qb.mc.bounds.i2$MC.ind <- i
+  other.qb.df2 <- rbind(other.qb.df2, qb.mc.bounds.i2)
+  
+  # For Jesson
+  jesson.mc.bounds.i <- jesson.mc.bounds[[i]]
+  jesson.mc.bounds.i.ci <- jesson.mc.bounds.i[jesson.mc.bounds.i$type == "CI", ]
+  jesson.mc.bounds.i.pei <- jesson.mc.bounds.i[jesson.mc.bounds.i$type == "PEI", ]
+  
+  jesson.coverage.vec[i] <- mean(jesson.mc.bounds.i.ci$lb <= jesson.mc.bounds.i.ci$apo & jesson.mc.bounds.i.ci$apo <= jesson.mc.bounds.i.ci$ub)
+  jesson.CI.length.vec[i] <- mean(jesson.mc.bounds.i.ci$ub - jesson.mc.bounds.i.ci$lb)
+  jesson.PEI.length.vec[i] <- mean(jesson.mc.bounds.i.pei$ub - jesson.mc.bounds.i.pei$lb)
+  
+  jesson.mc.bounds.i$MC.ind <- i
+  other.jesson.df <- rbind(other.jesson.df, jesson.mc.bounds.i)
+  
+  jesson.mc.bounds.i2 <- jesson.mc.bounds2[[i]]
+  jesson.mc.bounds.i2$MC.ind <- i
+  other.jesson.df2 <- rbind(other.jesson.df2, jesson.mc.bounds.i2)
+}
+```
+
+```{r}
+other.qb.df2$method <- "Proposed method (DR)"
+ci.data <- rbind(other.qb.df, other.qb.df2, other.jesson.df)
+ci.data <- ci.data[ci.data$type == "CI", ]
+
+ci.data[ci.data$method == "Continuous SAIPW-QB", ]$method <- "Proposed method"
+ci.data[ci.data$method == "Jesson et al.", ]$method <- "Jesson et al. (2022)"
+ci.data$method <- factor(ci.data$method, levels=c("Proposed method", "Proposed method (DR)", "Jesson et al. (2022)"))
+
+# png("images/simul_sens_anal_20MC.png", units="in", width=6.68, height=5.72, res=400)
+# Plot the CI boxplots to compare Jesson et al. to our method and our DR estimator
+ci.simu.comparison.plot <- ggplot(ci.data) +
+  geom_boxplot(aes(x=factor(signif(dose, 3)), y=lb, fill=method), fatten=TRUE, width=0.4, outlier.shape=NA) +
+  geom_boxplot(aes(x=factor(signif(dose, 3)), y=ub, fill=method), fatten=TRUE, width=0.4, outlier.shape=NA) +
+  geom_point(aes(x=factor(signif(dose, 3)), y=apo, group=1), shape=18, size=3, color=apo_color) +
+  scale_fill_manual(values=c(our_method_blue, our_method_dr_yellow, jesson_red), breaks=c("Proposed method", "Proposed method (DR)", "Jesson et al. (2022)")) +
+  labs(fill="Method", x=TeX(r"(Treatment or exposition $\tau$)"), y="Outcome Y") +
+  theme_linedraw() +
+  theme(legend.position=c(0.81, 0.15), legend.background=element_rect(size=0.3, linetype="solid", colour="black"),
+        axis.title.x=element_text(size=12),
+        axis.title.y=element_text(size=12),
+        axis.text=element_text(size=10),
+        legend.text=element_text(size=11),
+        legend.title=element_text(size=12),
+        panel.grid.major.x=element_blank()) +
+  annotate("text", x=5.2, y=1.55, label=TeX(r"($\theta(\tau)$)"), colour=apo_color, size=5, parse=TRUE)
+ci.simu.comparison.plot
+# dev.off()
+```
+
+### Sensitivity analysis on 1 MC sample with our method
+
+```{r}
+commandArgs <- function(...) c(FALSE, 1, "simul", 1, "NULL", FALSE, 15, 3)
+source("./sens_analys_MC_cmr_and_simu.R")
+```
+
+```{r}
+version <- "v3"
+
+qb.mc.bounds <- readRDS(paste0("results/qb_simul_APO_bounds_B_100_", version, ".RData"))
+qb.exec.times <- readRDS(paste0("results/qb_simul_exec_time_B_100_", version, ".RData"))
+qb.cov <- readRDS(paste0("results/qb_simul_cov_B_100_", version, ".RData"))
+
+jesson.mc.bounds <- readRDS(paste0("results/jesson_simul_APO_bounds_B_100_", version, ".RData"))
+jesson.exec.times <- readRDS(paste0("results/jesson_simul_exec_time_B_100_", version, ".RData"))
+jesson.cov <- readRDS(paste0("results/jesson_simul_cov_B_100_", version, ".RData"))
+
+gammas <- readRDS(paste0("results/gammas_simul_", version, ".RData"))
+
+observed.data.df <- data.frame(lb=NA, ub=NA, unconf=NA,
+                               apo=rep(apo_for_plot_fun(t), 2),
+                               dose=rep(t, 2),
+                               name=NA, method=NA,
+                               type=c(rep("PEI", nrow(X)), rep("CI", nrow(X))),
+                               y.observed=rep(Y, 2))
+
+type.labs <- c("Confidence Interval", "Point Estimate Interval")
+names(type.labs) <- c("CI", "PEI")
+
+qb.df.plot <- qb.mc.bounds[[1]]
+qb.df.plot$y.observed <- NA
+```
+
+```{r, fig.width = 7.69, fig.height = 4.54}
+# Plot with both intervals on one graph
+# png("images/simul_sens_anal_PEI_CI_1MC.png", units="in", width=7.69, height=4.54, res=400)
+simul.pei.ci.plot <- ggplot(data=qb.df.plot) +
+  geom_point(data=observed.data.df, aes(x=dose, y=y.observed), colour="#EEEEEE") +
+  geom_ribbon(aes(ymin=lb, ymax=ub, x=dose, fill=type, colour=type), alpha=0.25) +
+  geom_line(aes(x=dose, y=unconf), linetype="dashed", col=our_method_blue, linewidth=0.7) +
+  geom_line(data=observed.data.df, aes(x=dose, y=apo), col=apo_color, linewidth=0.5) +
+  scale_x_continuous(breaks=unique(qb.df.plot$dose),
+                     labels=round(unique(qb.df.plot$dose), 2),
+                     limits=c(min(unique(qb.df.plot$dose))-0.2, max(unique(qb.df.plot$dose))+0.2)) +
+  scale_fill_discrete(guide="legend", name="Interval type", labels=type.labs) +
+  scale_color_discrete(guide="legend", name="Interval type", labels=type.labs) +
+  theme_linedraw() +
+  labs(x=TeX(paste("Treatment or exposition", r"($\tau$)")),
+       y="Outcome Y") +
+  theme(legend.position=c(0.87, 0.13), legend.background=element_rect(size=0.3, linetype="solid", colour="black")) +
+  annotate("text", x=1.83, y=2.4, label=TeX(r"($\theta(\tau)$)"), colour=apo_color, size=5, parse=TRUE) +
+  annotate("text", x=1.83, y=1.2, label="widehat(theta)(tau)", colour=our_method_blue, size=5, parse=TRUE)
+simul.pei.ci.plot
+# dev.off()
+```
+
+### Execution times for sensitivity analyses with 2, 3 and 4 values of treatment of interest (proposed method and Jesson et al. (2022) without parallel computing)
+
+```{r}
+# 1: parallel.computation.jesson (boolean)
+# 2: n.MC (1:infty)
+# 3: data.name ("simul" or "cmr")
+# 4: gamma_est, for cmr data (real number from 1 to 50) 
+# 5: xi.method (NULL or "neural_network")
+# 6: compute.jesson (boolean)
+# 7: doses.length (2:infty)
+# 8: version (1:infty)
+commandArgs <- function(...) c(FALSE, 3, "simul", 1, "NULL", TRUE, 2, 4)
+source("./sens_analys_MC_cmr_and_simu.R")
+
+commandArgs <- function(...) c(FALSE, 3, "simul", 1, "NULL", TRUE, 3, 5)
+source("./sens_analys_MC_cmr_and_simu.R")
+
+commandArgs <- function(...) c(FALSE, 3, "simul", 1, "NULL", TRUE, 4, 6)
+source("./sens_analys_MC_cmr_and_simu.R")
+```
+
+```{r}
+version <- "v4"
+version2 <- "v5"
+version3 <- "v6"
+
+qb.mc.bounds <- readRDS(paste0("results/qb_simul_APO_bounds_B_100_", version, ".RData"))
+qb.exec.times <- readRDS(paste0("results/qb_simul_exec_time_B_100_", version, ".RData"))
+qb.cov <- readRDS(paste0("results/qb_simul_cov_B_100_", version, ".RData"))
+
+jesson.mc.bounds <- readRDS(paste0("results/jesson_simul_APO_bounds_B_100_", version, ".RData"))
+jesson.exec.times <- readRDS(paste0("results/jesson_simul_exec_time_B_100_", version, ".RData"))
+jesson.cov <- readRDS(paste0("results/jesson_simul_cov_B_100_", version, ".RData"))
+
+gammas <- readRDS(paste0("results/gammas_simul_", version, ".RData"))
+
+qb.mc.bounds2 <- readRDS(paste0("results/qb_simul_APO_bounds_B_100_", version2, ".RData"))
+qb.exec.times2 <- readRDS(paste0("results/qb_simul_exec_time_B_100_", version2, ".RData"))
+qb.cov2 <- readRDS(paste0("results/qb_simul_cov_B_100_", version2, ".RData"))
+
+jesson.mc.bounds2 <- readRDS(paste0("results/jesson_simul_APO_bounds_B_100_", version2, ".RData"))
+jesson.exec.times2 <- readRDS(paste0("results/jesson_simul_exec_time_B_100_", version2, ".RData"))
+jesson.cov2 <- readRDS(paste0("results/jesson_simul_cov_B_100_", version2, ".RData"))
+
+gammas2 <- readRDS(paste0("results/gammas_simul_", version2, ".RData"))
+
+qb.mc.bounds3 <- readRDS(paste0("results/qb_simul_APO_bounds_B_100_", version3, ".RData"))
+qb.exec.times3 <- readRDS(paste0("results/qb_simul_exec_time_B_100_", version3, ".RData"))
+qb.cov3 <- readRDS(paste0("results/qb_simul_cov_B_100_", version3, ".RData"))
+
+jesson.mc.bounds3 <- readRDS(paste0("results/jesson_simul_APO_bounds_B_100_", version3, ".RData"))
+jesson.exec.times3 <- readRDS(paste0("results/jesson_simul_exec_time_B_100_", version3, ".RData"))
+jesson.cov3 <- readRDS(paste0("results/jesson_simul_cov_B_100_", version3, ".RData"))
+
+gammas3 <- readRDS(paste0("results/gammas_simul_", version3, ".RData"))
+
+n.MC <- length(qb.mc.bounds)
+doses.length <- length(qb.mc.bounds[[1]]$dose) / 2
+quant.order <- 0.99
+
+# Compute the mean coverage for each Monte-Carlo sample
+qb.coverage.vec <- rep(NA, n.MC)
+jesson.coverage.vec <- rep(NA, n.MC)
+# the mean CI length
+qb.CI.length.vec <- rep(NA, n.MC)
+jesson.CI.length.vec <- rep(NA, n.MC)
+# and the mean PEI length
+qb.PEI.length.vec <- rep(NA, n.MC)
+jesson.PEI.length.vec <- rep(NA, n.MC)
+
+other.qb.df <- NULL
+other.jesson.df <- NULL
+
+other.qb.df2 <- NULL
+other.jesson.df2 <- NULL
+
+other.qb.df3 <- NULL
+other.jesson.df3 <- NULL
+
+for (i in 1:n.MC) {
+  
+  # For continuous QB
+  qb.mc.bounds.i <- qb.mc.bounds[[i]]
+  qb.mc.bounds.i.ci <- qb.mc.bounds.i[qb.mc.bounds.i$type == "CI", ]
+  qb.mc.bounds.i.pei <- qb.mc.bounds.i[qb.mc.bounds.i$type == "PEI", ]
+  
+  qb.coverage.vec[i] <- mean(qb.mc.bounds.i.ci$lb <= qb.mc.bounds.i.ci$apo & qb.mc.bounds.i.ci$apo <= qb.mc.bounds.i.ci$ub)
+  qb.CI.length.vec[i] <- mean(qb.mc.bounds.i.ci$ub - qb.mc.bounds.i.ci$lb)
+  qb.PEI.length.vec[i] <- mean(qb.mc.bounds.i.pei$ub - qb.mc.bounds.i.pei$lb)
+  
+  qb.mc.bounds.i$MC.ind <- i
+  other.qb.df <- rbind(other.qb.df, qb.mc.bounds.i)
+  
+  qb.mc.bounds.i2 <- qb.mc.bounds2[[i]]
+  qb.mc.bounds.i2$MC.ind <- i
+  other.qb.df2 <- rbind(other.qb.df2, qb.mc.bounds.i2)
+
+  qb.mc.bounds.i3 <- qb.mc.bounds3[[i]]
+  qb.mc.bounds.i3$MC.ind <- i
+  other.qb.df3 <- rbind(other.qb.df3, qb.mc.bounds.i3)
+  
+  # For Jesson
+  jesson.mc.bounds.i <- jesson.mc.bounds[[i]]
+  jesson.mc.bounds.i.ci <- jesson.mc.bounds.i[jesson.mc.bounds.i$type == "CI", ]
+  jesson.mc.bounds.i.pei <- jesson.mc.bounds.i[jesson.mc.bounds.i$type == "PEI", ]
+  
+  jesson.coverage.vec[i] <- mean(jesson.mc.bounds.i.ci$lb <= jesson.mc.bounds.i.ci$apo & jesson.mc.bounds.i.ci$apo <= jesson.mc.bounds.i.ci$ub)
+  jesson.CI.length.vec[i] <- mean(jesson.mc.bounds.i.ci$ub - jesson.mc.bounds.i.ci$lb)
+  jesson.PEI.length.vec[i] <- mean(jesson.mc.bounds.i.pei$ub - jesson.mc.bounds.i.pei$lb)
+  
+  jesson.mc.bounds.i$MC.ind <- i
+  other.jesson.df <- rbind(other.jesson.df, jesson.mc.bounds.i)
+  
+  jesson.mc.bounds.i2 <- jesson.mc.bounds2[[i]]
+  jesson.mc.bounds.i2$MC.ind <- i
+  other.jesson.df2 <- rbind(other.jesson.df2, jesson.mc.bounds.i2)
+
+  jesson.mc.bounds.i3 <- jesson.mc.bounds3[[i]]
+  jesson.mc.bounds.i3$MC.ind <- i
+  other.jesson.df3 <- rbind(other.jesson.df3, jesson.mc.bounds.i3)
+}
+
+time.factor <- mean(jesson.exec.times) / mean(qb.exec.times)
+print(paste("Our method is on average", signif(time.factor, 2), "times faster than the one from Jesson et al. (2022) for 2 values of treatment of interest."))
+```
+
+```{r, fig.width = 5.99, fig.height = 4.58}
+# For the evolution of execution time as a function of the number of treatment of interest
+exec.time.df1 <- data.frame(time=c(qb.exec.times, jesson.exec.times),
+                            algo=c(rep("Proposed method", n.MC), rep("Jesson et al. (2022)", n.MC)),
+                            doses.length=rep(2, n.MC))
+
+exec.time.df2 <- data.frame(time=c(qb.exec.times2, jesson.exec.times2),
+                            algo=c(rep("Proposed method", n.MC), rep("Jesson et al. (2022)", n.MC)),
+                            doses.length=rep(3, n.MC))
+
+exec.time.df3 <- data.frame(time=c(qb.exec.times3, jesson.exec.times3),
+                            algo=c(rep("Proposed method", n.MC), rep("Jesson et al. (2022)", n.MC)),
+                            doses.length=rep(4, n.MC))
+
+exec.times.df <- rbind(exec.time.df1, exec.time.df2, exec.time.df3)
+
+# png("images/simul_exec_times_3MC.png", units="in", width=5.99, height=4.58, res=400)
+exec.time.plot <- ggplot(exec.times.df) +
+  geom_boxplot(aes(x=as.factor(doses.length), y=time, color=algo), position=position_dodge(width=0)) +
+  scale_y_log10(breaks=trans_breaks("log10", function(x) 10^x),
+                labels=trans_format("log10", math_format(10^.x))) +
+  theme_linedraw() +
+  labs(color="Method", x=TeX(r"(Number of treatments $\tau$)"), y="Execution time (in seconds)") +
+  scale_color_manual(values=c(our_method_blue, jesson_red), breaks=c("Proposed method", "Jesson et al. (2022)")) +
+  theme(legend.position=c(0.8, 0.35),
+        legend.background=element_rect(linewidth=0.3, linetype="solid", colour="black"),
+        axis.title.x=element_text(size=12),
+        axis.title.y=element_text(size=12),
+        axis.text=element_text(size=10),
+        legend.text=element_text(size=11),
+        legend.title=element_text(size=12))
+exec.time.plot
+# dev.off()
+```
+
+### Exploratory analysis of the values of the sensitivity parameter
+
+As a function of the correlation between $\mathbf{X}$ and $\mathbf{U}$, $\rho_\mathbf{XU}$.
+```{r, fig.width = 5.16, fig.height = 4.54}
+commandArgs <- function(...) "correlation.prop"
+source("./MC_simu_gamma_estim.R")  # This can take a few seconds
+gamma.vs.corrXU.plot
+```
+
+As a function of $\beta_U$.
+```{r, fig.width = 5.16, fig.height = 4.54}
+commandArgs <- function(...) "beta_U"
+source("./MC_simu_gamma_estim.R")  # This can take a few seconds
+gamma.vs.beta_u.plot
+```
+
+
+
+## Real data
+
+```{r}
+# Preprocess the data
+data.folder.name <- "data/pm25/"
+preprocessed.data <- preprocess.pm2.5.cmr.data(data.folder.name)
+unnormalized.data <- preprocessed.data$unnormalized.data  # Get all unnormalized data
+```
+
+```{r, fig.width = 7.05, fig.height = 4.73}
+# To plot CMR as a function of PM2.5
+# png("images/cmr_data.png", units="in", width=7.05, height=4.73, res=400)
+ggplot(unnormalized.data, aes(x=PM2.5, y=CMR)) +
+  geom_point() +
+  theme_linedraw() +
+  labs(x=TeX(r"($PM_{2.5}$ ($\mu g/m^3$))"), y=TeX(r"(CMR (annual deaths per 100,000 people))"))
+# dev.off()
+```
+
+
+### Sensitivity analysis for 15 values of expositions and 6 values of sensitivity parameter, to compare the proposed methodology to Jesson et al. (2022)
+
+```{r}
+# 1: parallel.computation.jesson (boolean)
+# 2: n.MC (1:infty)
+# 3: data.name ("simul" or "cmr")
+# 4: gamma_est, for cmr data (real number from 1 to 50) 
+# 5: xi.method (NULL or "neural_network")
+# 6: compute.jesson (boolean)
+# 7: doses.length (2:infty)
+# 8: version (1:infty)
+commandArgs <- function(...) c(TRUE, 1, "cmr", 1.01, "NULL", TRUE, 15, 1)
+source("./sens_analys_MC_cmr_and_simu.R")
+
+commandArgs <- function(...) c(TRUE, 1, "cmr", 1.25, "NULL", TRUE, 15, 2)
+source("./sens_analys_MC_cmr_and_simu.R")
+
+commandArgs <- function(...) c(TRUE, 1, "cmr", 1.5, "NULL", TRUE, 15, 3)
+source("./sens_analys_MC_cmr_and_simu.R")
+
+commandArgs <- function(...) c(TRUE, 1, "cmr", 2, "NULL", TRUE, 15, 4)
+source("./sens_analys_MC_cmr_and_simu.R")
+
+commandArgs <- function(...) c(TRUE, 1, "cmr", 3, "NULL", TRUE, 15, 5)
+source("./sens_analys_MC_cmr_and_simu.R")
+
+commandArgs <- function(...) c(TRUE, 1, "cmr", 50, "NULL", TRUE, 15, 6)
+source("./sens_analys_MC_cmr_and_simu.R")
+```
+
+```{r}
+version <- "v1"
+version2 <- "v2"
+version3 <- "v3"
+version4 <- "v4"
+version5 <- "v5"
+version6 <- "v6"
+
+qb.mc.bounds <- readRDS(paste0("results/qb_cmr_APO_bounds_B_100_", version, ".RData"))
+qb.exec.times <- readRDS(paste0("results/qb_cmr_exec_time_B_100_", version, ".RData"))
+qb.cov <- readRDS(paste0("results/qb_cmr_cov_B_100_", version, ".RData"))
+
+jesson.mc.bounds <- readRDS(paste0("results/jesson_cmr_APO_bounds_B_100_", version, ".RData"))
+jesson.exec.times <- readRDS(paste0("results/jesson_cmr_exec_time_B_100_", version, ".RData"))
+jesson.cov <- readRDS(paste0("results/jesson_cmr_cov_B_100_", version, ".RData"))
+
+gammas <- readRDS(paste0("results/gammas_cmr_", version, ".RData"))
+
+
+qb.mc.bounds2 <- readRDS(paste0("results/qb_cmr_APO_bounds_B_100_", version2, ".RData"))
+qb.exec.times2 <- readRDS(paste0("results/qb_cmr_exec_time_B_100_", version2, ".RData"))
+qb.cov2 <- readRDS(paste0("results/qb_cmr_cov_B_100_", version2, ".RData"))
+
+jesson.mc.bounds2 <- readRDS(paste0("results/jesson_cmr_APO_bounds_B_100_", version2, ".RData"))
+jesson.exec.times2 <- readRDS(paste0("results/jesson_cmr_exec_time_B_100_", version2, ".RData"))
+jesson.cov2 <- readRDS(paste0("results/jesson_cmr_cov_B_100_", version2, ".RData"))
+
+gammas2 <- readRDS(paste0("results/gammas_cmr_", version2, ".RData"))
+
+
+qb.mc.bounds3 <- readRDS(paste0("results/qb_cmr_APO_bounds_B_100_", version3, ".RData"))
+qb.exec.times3 <- readRDS(paste0("results/qb_cmr_exec_time_B_100_", version3, ".RData"))
+qb.cov3 <- readRDS(paste0("results/qb_cmr_cov_B_100_", version3, ".RData"))
+
+jesson.mc.bounds3 <- readRDS(paste0("results/jesson_cmr_APO_bounds_B_100_", version3, ".RData"))
+jesson.exec.times3 <- readRDS(paste0("results/jesson_cmr_exec_time_B_100_", version3, ".RData"))
+jesson.cov3 <- readRDS(paste0("results/jesson_cmr_cov_B_100_", version3, ".RData"))
+
+gammas3 <- readRDS(paste0("results/gammas_cmr_", version3, ".RData"))
+
+
+qb.mc.bounds4 <- readRDS(paste0("results/qb_cmr_APO_bounds_B_100_", version4, ".RData"))
+qb.exec.times4 <- readRDS(paste0("results/qb_cmr_exec_time_B_100_", version4, ".RData"))
+qb.cov4 <- readRDS(paste0("results/qb_cmr_cov_B_100_", version4, ".RData"))
+
+jesson.mc.bounds4 <- readRDS(paste0("results/jesson_cmr_APO_bounds_B_100_", version4, ".RData"))
+jesson.exec.times4 <- readRDS(paste0("results/jesson_cmr_exec_time_B_100_", version4, ".RData"))
+jesson.cov4 <- readRDS(paste0("results/jesson_cmr_cov_B_100_", version4, ".RData"))
+
+gammas4 <- readRDS(paste0("results/gammas_cmr_", version4, ".RData"))
+
+
+qb.mc.bounds5 <- readRDS(paste0("results/qb_cmr_APO_bounds_B_100_", version5, ".RData"))
+qb.exec.times5 <- readRDS(paste0("results/qb_cmr_exec_time_B_100_", version5, ".RData"))
+qb.cov5 <- readRDS(paste0("results/qb_cmr_cov_B_100_", version5, ".RData"))
+
+jesson.mc.bounds5 <- readRDS(paste0("results/jesson_cmr_APO_bounds_B_100_", version5, ".RData"))
+jesson.exec.times5 <- readRDS(paste0("results/jesson_cmr_exec_time_B_100_", version5, ".RData"))
+jesson.cov5 <- readRDS(paste0("results/jesson_cmr_cov_B_100_", version5, ".RData"))
+
+gammas5 <- readRDS(paste0("results/gammas_cmr_", version5, ".RData"))
+
+
+qb.mc.bounds6 <- readRDS(paste0("results/qb_cmr_APO_bounds_B_100_", version6, ".RData"))
+qb.exec.times6 <- readRDS(paste0("results/qb_cmr_exec_time_B_100_", version6, ".RData"))
+qb.cov6 <- readRDS(paste0("results/qb_cmr_cov_B_100_", version6, ".RData"))
+
+jesson.mc.bounds6 <- readRDS(paste0("results/jesson_cmr_APO_bounds_B_100_", version6, ".RData"))
+jesson.exec.times6 <- readRDS(paste0("results/jesson_cmr_exec_time_B_100_", version6, ".RData"))
+jesson.cov6 <- readRDS(paste0("results/jesson_cmr_cov_B_100_", version6, ".RData"))
+
+gammas6 <- readRDS(paste0("results/gammas_cmr_", version6, ".RData"))
+```
+
+```{r}
+n.MC <- length(qb.mc.bounds)
+doses.length <- length(qb.mc.bounds[[1]]$dose) / 2
+quant.order <- 0.99
+
+
+# Compute the mean coverage for each Monte-Carlo sample
+qb.coverage.vec <- rep(NA, n.MC)
+jesson.coverage.vec <- rep(NA, n.MC)
+# the mean CI length
+qb.CI.length.vec <- rep(NA, n.MC)
+jesson.CI.length.vec <- rep(NA, n.MC)
+# and the mean PEI length
+qb.PEI.length.vec <- rep(NA, n.MC)
+jesson.PEI.length.vec <- rep(NA, n.MC)
+
+other.qb.df <- NULL
+other.jesson.df <- NULL
+
+other.qb.df2 <- NULL
+other.jesson.df2 <- NULL
+
+other.qb.df3 <- NULL
+other.jesson.df3 <- NULL
+
+other.qb.df4 <- NULL
+other.jesson.df4 <- NULL
+
+other.qb.df5 <- NULL
+other.jesson.df5 <- NULL
+
+other.qb.df6 <- NULL
+other.jesson.df6 <- NULL
+
+for (i in 1:n.MC) {
+  
+  # For continuous QB
+  qb.mc.bounds.i <- qb.mc.bounds[[i]]
+  qb.mc.bounds.i.ci <- qb.mc.bounds.i[qb.mc.bounds.i$type == "CI", ]
+  qb.mc.bounds.i.pei <- qb.mc.bounds.i[qb.mc.bounds.i$type == "PEI", ]
+  
+  qb.coverage.vec[i] <- mean(qb.mc.bounds.i.ci$lb <= qb.mc.bounds.i.ci$apo & qb.mc.bounds.i.ci$apo <= qb.mc.bounds.i.ci$ub)
+  qb.CI.length.vec[i] <- mean(qb.mc.bounds.i.ci$ub - qb.mc.bounds.i.ci$lb)
+  qb.PEI.length.vec[i] <- mean(qb.mc.bounds.i.pei$ub - qb.mc.bounds.i.pei$lb)
+  
+  qb.mc.bounds.i$MC.ind <- i
+  other.qb.df <- rbind(other.qb.df, qb.mc.bounds.i)
+  
+  qb.mc.bounds.i2 <- qb.mc.bounds2[[i]]
+  qb.mc.bounds.i2$MC.ind <- i
+  other.qb.df2 <- rbind(other.qb.df2, qb.mc.bounds.i2)
+
+  qb.mc.bounds.i3 <- qb.mc.bounds3[[i]]
+  qb.mc.bounds.i3$MC.ind <- i
+  other.qb.df3 <- rbind(other.qb.df3, qb.mc.bounds.i3)
+
+  qb.mc.bounds.i4 <- qb.mc.bounds4[[i]]
+  qb.mc.bounds.i4$MC.ind <- i
+  other.qb.df4 <- rbind(other.qb.df4, qb.mc.bounds.i4)
+
+  qb.mc.bounds.i5 <- qb.mc.bounds5[[i]]
+  qb.mc.bounds.i5$MC.ind <- i
+  other.qb.df5 <- rbind(other.qb.df5, qb.mc.bounds.i5)
+
+  qb.mc.bounds.i6 <- qb.mc.bounds6[[i]]
+  qb.mc.bounds.i6$MC.ind <- i
+  other.qb.df6 <- rbind(other.qb.df6, qb.mc.bounds.i6)
+  
+  # For Jesson
+  jesson.mc.bounds.i <- jesson.mc.bounds[[i]]
+  jesson.mc.bounds.i.ci <- jesson.mc.bounds.i[jesson.mc.bounds.i$type == "CI", ]
+  jesson.mc.bounds.i.pei <- jesson.mc.bounds.i[jesson.mc.bounds.i$type == "PEI", ]
+  
+  jesson.coverage.vec[i] <- mean(jesson.mc.bounds.i.ci$lb <= jesson.mc.bounds.i.ci$apo & jesson.mc.bounds.i.ci$apo <= jesson.mc.bounds.i.ci$ub)
+  jesson.CI.length.vec[i] <- mean(jesson.mc.bounds.i.ci$ub - jesson.mc.bounds.i.ci$lb)
+  jesson.PEI.length.vec[i] <- mean(jesson.mc.bounds.i.pei$ub - jesson.mc.bounds.i.pei$lb)
+  
+  jesson.mc.bounds.i$MC.ind <- i
+  other.jesson.df <- rbind(other.jesson.df, jesson.mc.bounds.i)
+  
+  jesson.mc.bounds.i2 <- jesson.mc.bounds2[[i]]
+  jesson.mc.bounds.i2$MC.ind <- i
+  other.jesson.df2 <- rbind(other.jesson.df2, jesson.mc.bounds.i2)
+
+  jesson.mc.bounds.i3 <- jesson.mc.bounds3[[i]]
+  jesson.mc.bounds.i3$MC.ind <- i
+  other.jesson.df3 <- rbind(other.jesson.df3, jesson.mc.bounds.i3)
+
+  jesson.mc.bounds.i4 <- jesson.mc.bounds4[[i]]
+  jesson.mc.bounds.i4$MC.ind <- i
+  other.jesson.df4 <- rbind(other.jesson.df4, jesson.mc.bounds.i4)
+
+  jesson.mc.bounds.i5 <- jesson.mc.bounds5[[i]]
+  jesson.mc.bounds.i5$MC.ind <- i
+  other.jesson.df5 <- rbind(other.jesson.df5, jesson.mc.bounds.i5)
+
+  jesson.mc.bounds.i6 <- jesson.mc.bounds6[[i]]
+  jesson.mc.bounds.i6$MC.ind <- i
+  other.jesson.df6 <- rbind(other.jesson.df6, jesson.mc.bounds.i6)
+}
+```
+
+```{r}
+# Colorblind palette
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#CC79A7", "#0072B2", "#D55E00", "#F0E442")
+
+other.qb.df$gamma <- 1.01
+other.qb.df2$gamma <- 1.25
+other.qb.df3$gamma <- 1.5
+other.qb.df4$gamma <- 2
+other.qb.df5$gamma <- 3
+other.qb.df6$gamma <- 50
+
+other.jesson.df$gamma <- 1.01
+other.jesson.df2$gamma <- 1.25
+other.jesson.df3$gamma <- 1.5
+other.jesson.df4$gamma <- 2
+other.jesson.df5$gamma <- 3
+other.jesson.df6$gamma <- 50
+
+ci.data <- rbind(other.qb.df,
+                 other.qb.df2,
+                 other.qb.df3,
+                 other.qb.df4,
+                 other.qb.df5,
+                 other.qb.df6,
+                 other.jesson.df,
+                 other.jesson.df2,
+                 other.jesson.df3,
+                 other.jesson.df4,
+                 other.jesson.df5,
+                 other.jesson.df6)
+
+ci.data <- ci.data[ci.data$type == "CI", ]
+ci.data[ci.data$method == "Continuous SAIPW-QB", ]$method <- "Proposed method"
+ci.data[ci.data$method == "Jesson et al.", ]$method <- "Jesson et al. (2022)"
+
+CMR.mean <- mean(unnormalized.data$CMR)
+
+#png("images/cmr_sens_anal_without_gamma_50.png", units="in", width=11.44, height=4.73, res=400)  # height=5.44
+cmr.sens.anal.plot <- ggplot(ci.data) +
+  geom_point(data=unnormalized.data, aes(x=PM2.5, y=CMR), color="#EEEEEE") +
+  geom_line(aes(x=dose, y=lb, linetype=method, color=as.factor(gamma))) +
+  geom_line(aes(x=dose, y=ub, linetype=method, color=as.factor(gamma))) +
+  geom_hline(yintercept=CMR.mean, linetype="twodash", color="red", alpha=0.7) +  # yintercept=247
+  theme_linedraw() +
+  scale_color_manual(values=cbp1) +  # colorblind palette
+  scale_linetype_manual(name="Method", values=c("solid", "longdash"), breaks=c("Proposed method", "Jesson et al. (2022)")) +
+  scale_x_continuous(breaks=unique(ci.data$dose),
+                     labels=signif(unique(ci.data$dose), 3),
+                     limits=c(3.27-0.5, 7.98+0.5)) +
+  labs(color=TeX(r"(Sensitivity parameter \Gamma)"), x=TeX(r"($PM_{2.5}$ ($\mu g / m^3$))"), y=TeX(r"(CMR (annual deaths per 100,000 people))")) +
+  annotate("text", x=2.8, y=CMR.mean+8, label=round(CMR.mean, 0), colour="red", alpha=0.7) +
+  theme(axis.title.x=element_text(size=14),
+        axis.title.y=element_text(size=14),
+        axis.text=element_text(size=10),
+        legend.text=element_text(size=11),
+        legend.title=element_text(size=12)) +
+  ylim(100, 430)
+cmr.sens.anal.plot
+#dev.off()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
