@@ -694,7 +694,7 @@ for (i in 1:n.MC) {
 }
 ```
 
-```{r}
+```{r, fig.width = 10, fig.height = 4.54}
 # Colorblind palette
 cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
           "#CC79A7", "#0072B2", "#D55E00", "#F0E442")
