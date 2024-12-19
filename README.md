@@ -7,13 +7,14 @@ In causal inference, treatment effects are typically estimated under the ignorab
 ## Description
 This repository is related to the paper *Sharp Bounds for Continuous-Valued Treatment Effects with Unobserved Confounders*, Baitairian et al. (2024). It is organized as follows:
 
-- **sharp_bounds_cont_val_treatment.Rmd**: a R Markdown document to reproduce the figures from the paper;
+- **sharp_bounds_cont_val_treatment.Rmd**: a R Markdown document to reproduce the figures and numerical results from the paper;
 - **utils.R**: functions used by the proposed algorithm and the one from Jesson et al. (2022);
 - **cont_qb_fun.R**: functions used exclusively by the proposed algorithm;
 - **jesson_fun.R**: functions used exclusively by the algorithm from Jesson et al. (2022);
 - **simulated_data.fun**: functions used to create the simulated dataset;
 - **sens_analys_MC_cmr_and_simu.R**: file to perform sensitivity analyses on Monte-Carlo simulated sample and on real data;
 - **MC_simu_gamma_estim.R**: file to perform the exploratory analysis of the evolution of the sensitivity parameter $\Gamma$ with respect to the dataset generation parameters;
+- **sens_param_estim_inf_bench.R**: file to estimate plausible values of the sensitivity parameter $\Gamma$ via informal benchmarking;
 - **/images**: a folder to save the generated plots;
 - **/params**: a folder to contain optimal neural network parameters obtained after the fine-tuning step;
 - **/data**: a folder that contains the real data from the U.S. Environmental Protection Agency (Wyatt et al., 2020).
@@ -26,7 +27,7 @@ Jesson, Andrew et al. (2022). “Scalable sensitivity and uncertainty analyses f
 Wyatt, Lauren H et al. (2020). “Annual PM2. 5 and cardiovascular mortality rate data: Trends modified by county socioeconomic status in 2,132 US counties”. In: Data in brief 30, p. 105318
 
 ## Requirements and Licenses
-The following libraries are used in this repository with R version 4.3.2.
+This repository is under a non commercial license notice (see **LICENSE.txt** file). The following libraries are used in this repository with R version 4.3.2.
 
 |Library|Version|License|
 |---|---|---|
