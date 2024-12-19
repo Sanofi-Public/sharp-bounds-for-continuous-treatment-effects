@@ -27,7 +27,7 @@ Jesson, Andrew et al. (2022). “Scalable sensitivity and uncertainty analyses f
 Wyatt, Lauren H et al. (2020). “Annual PM2. 5 and cardiovascular mortality rate data: Trends modified by county socioeconomic status in 2,132 US counties”. In: Data in brief 30, p. 105318
 
 ## Requirements and Licenses
-This repository is under a non commercial license notice (see **LICENSE.txt** file). The following libraries are used in this repository with R version 4.3.2.
+This repository is under a non commercial license (see **LICENSE.txt** file). The following libraries are used in this repository with R version 4.3.2.
 
 |Library|Version|License|
 |---|---|---|
