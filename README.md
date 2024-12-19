@@ -14,7 +14,7 @@ This repository is related to the paper *Sharp Bounds for Continuous-Valued Trea
 - **simulated_data.fun**: functions used to create the simulated dataset;
 - **sens_analys_MC_cmr_and_simu.R**: file to perform sensitivity analyses on Monte-Carlo simulated sample and on real data;
 - **MC_simu_gamma_estim.R**: file to perform the exploratory analysis of the evolution of the sensitivity parameter $\Gamma$ with respect to the dataset generation parameters;
-- **sens_param_estim_inf_bench.R**: file to estimate plausible values of the sensitivity parameter $\Gamma$ via informal benchmarking;
+- **sens_param_estim_inf_bench.R**: file to estimate plausible values of the sensitivity parameter $\Gamma$ on the real data via informal benchmarking;
 - **/images**: a folder to save the generated plots;
 - **/params**: a folder to contain optimal neural network parameters obtained after the fine-tuning step;
 - **/data**: a folder that contains the real data from the U.S. Environmental Protection Agency (Wyatt et al., 2020).
