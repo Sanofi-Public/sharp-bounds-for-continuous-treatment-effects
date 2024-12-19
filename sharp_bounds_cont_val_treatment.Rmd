@@ -467,7 +467,6 @@ gamma.vs.beta_u.plot
 ```
 
 
-
 ## Real data
 
 ```{r}
@@ -486,7 +485,6 @@ ggplot(unnormalized.data, aes(x=PM2.5, y=CMR)) +
   labs(x=TeX(r"($PM_{2.5}$ ($\mu g/m^3$))"), y=TeX(r"(CMR (annual deaths per 100,000 people))"))
 # dev.off()
 ```
-
 
 ### Sensitivity analysis for 15 values of expositions and 6 values of sensitivity parameter, to compare the proposed methodology to Jesson et al. (2022)
 
@@ -756,7 +754,11 @@ cmr.sens.anal.plot
 #dev.off()
 ```
 
+### Estimation of the sensitivity parameter via informal benchmarking
 
+```{r}
+source("./sens_param_estim_inf_bench.R")
+```
 
 
 

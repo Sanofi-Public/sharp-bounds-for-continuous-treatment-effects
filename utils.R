@@ -101,6 +101,18 @@ delete.optimal.params.files <- function(data.name) {
 }
 
 
+# Function to estimate the sensitivity parameter gamma via informal benchmarking
+gamma.estim.fun <- function(gps.all.conf, gps.conf.minus.i) {
+  
+  cmsm.ratios <- gps.all.conf/gps.conf.minus.i
+  estimated.gamma <- max(max(cmsm.ratios), 1/min(cmsm.ratios))
+  
+  message(paste("max(max(ratio), 1/min(ratio)):", estimated.gamma))
+  
+  return(list(estimated.gamma=estimated.gamma))
+}
+
+
 # The neural network used to compute p(y|x,t)
 base_neural_network <- nn_module(classname="BaseNN",
                                  initialize=function(dim_cov, dim_output, num_components, dim_hidden) {
