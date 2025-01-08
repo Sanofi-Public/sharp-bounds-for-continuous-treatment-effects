@@ -40,6 +40,8 @@ apo_color <- "violetred3"
 ## Simulated dataset
 
 Example of one Monte-Carlo sample with the true APO curve.
+
+Figure 6
 ```{r, fig.width = 7.06, fig.height = 5.72}
 # Sample size
 n <- 1000
@@ -202,7 +204,8 @@ for (i in 1:n.MC) {
 }
 ```
 
-```{r}
+Figure 8
+```{r, fig.width = 6.68, fig.height = 5.72}
 other.qb.df2$method <- "Proposed method (DR)"
 ci.data <- rbind(other.qb.df, other.qb.df2, other.jesson.df)
 ci.data <- ci.data[ci.data$type == "CI", ]
@@ -211,13 +214,38 @@ ci.data[ci.data$method == "Continuous SAIPW-QB", ]$method <- "Proposed method"
 ci.data[ci.data$method == "Jesson et al.", ]$method <- "Jesson et al. (2022)"
 ci.data$method <- factor(ci.data$method, levels=c("Proposed method", "Proposed method (DR)", "Jesson et al. (2022)"))
 
-# png("images/simul_sens_anal_20MC.png", units="in", width=6.68, height=5.72, res=400)
+# png("images/simul_sens_anal_with_dr_20MC.png", units="in", width=6.68, height=5.72, res=400)
 # Plot the CI boxplots to compare Jesson et al. to our method and our DR estimator
 ci.simu.comparison.plot <- ggplot(ci.data) +
   geom_boxplot(aes(x=factor(signif(dose, 3)), y=lb, fill=method), fatten=TRUE, width=0.4, outlier.shape=NA) +
   geom_boxplot(aes(x=factor(signif(dose, 3)), y=ub, fill=method), fatten=TRUE, width=0.4, outlier.shape=NA) +
   geom_point(aes(x=factor(signif(dose, 3)), y=apo, group=1), shape=18, size=3, color=apo_color) +
   scale_fill_manual(values=c(our_method_blue, our_method_dr_yellow, jesson_red), breaks=c("Proposed method", "Proposed method (DR)", "Jesson et al. (2022)")) +
+  labs(fill="Method", x=TeX(r"(Treatment or exposition $\tau$)"), y="Outcome Y") +
+  theme_linedraw() +
+  theme(legend.position=c(0.81, 0.15), legend.background=element_rect(size=0.3, linetype="solid", colour="black"),
+        axis.title.x=element_text(size=12),
+        axis.title.y=element_text(size=12),
+        axis.text=element_text(size=10),
+        legend.text=element_text(size=11),
+        legend.title=element_text(size=12),
+        panel.grid.major.x=element_blank()) +
+  annotate("text", x=5.2, y=1.55, label=TeX(r"($\theta(\tau)$)"), colour=apo_color, size=5, parse=TRUE)
+ci.simu.comparison.plot
+# dev.off()
+```
+
+Figure 2
+```{r, fig.width = 6.68, fig.height = 5.72}
+ci.data <- ci.data[ci.data$method != "Proposed method (DR)", ]
+
+# png("images/simul_sens_anal_20MC.png", units="in", width=6.68, height=5.72, res=400)
+# Plot the CI boxplots to compare Jesson et al. to our method and our DR estimator
+ci.simu.comparison.plot <- ggplot(ci.data) +
+  geom_boxplot(aes(x=factor(signif(dose, 3)), y=lb, fill=method), fatten=TRUE, width=0.4, outlier.shape=NA) +
+  geom_boxplot(aes(x=factor(signif(dose, 3)), y=ub, fill=method), fatten=TRUE, width=0.4, outlier.shape=NA) +
+  geom_point(aes(x=factor(signif(dose, 3)), y=apo, group=1), shape=18, size=3, color=apo_color) +
+  scale_fill_manual(values=c(our_method_blue, jesson_red), breaks=c("Proposed method", "Jesson et al. (2022)")) +
   labs(fill="Method", x=TeX(r"(Treatment or exposition $\tau$)"), y="Outcome Y") +
   theme_linedraw() +
   theme(legend.position=c(0.81, 0.15), legend.background=element_rect(size=0.3, linetype="solid", colour="black"),
@@ -266,6 +294,7 @@ qb.df.plot <- qb.mc.bounds[[1]]
 qb.df.plot$y.observed <- NA
 ```
 
+Figure 7
 ```{r, fig.width = 7.69, fig.height = 4.54}
 # Plot with both intervals on one graph
 # png("images/simul_sens_anal_PEI_CI_1MC.png", units="in", width=7.69, height=4.54, res=400)
@@ -415,6 +444,7 @@ time.factor <- mean(jesson.exec.times) / mean(qb.exec.times)
 print(paste("Our method is on average", signif(time.factor, 2), "times faster than the one from Jesson et al. (2022) for 2 values of treatment of interest."))
 ```
 
+Figure 1
 ```{r, fig.width = 5.99, fig.height = 4.58}
 # For the evolution of execution time as a function of the number of treatment of interest
 exec.time.df1 <- data.frame(time=c(qb.exec.times, jesson.exec.times),
@@ -453,6 +483,8 @@ exec.time.plot
 ### Exploratory analysis of the values of the sensitivity parameter
 
 As a function of the correlation between $\mathbf{X}$ and $\mathbf{U}$, $\rho_\mathbf{XU}$.
+
+Figure 9
 ```{r, fig.width = 5.16, fig.height = 4.54}
 commandArgs <- function(...) "correlation.prop"
 source("./MC_simu_gamma_estim.R")  # This can take a few seconds
@@ -460,6 +492,8 @@ gamma.vs.corrXU.plot
 ```
 
 As a function of $\beta_U$.
+
+Figure 10
 ```{r, fig.width = 5.16, fig.height = 4.54}
 commandArgs <- function(...) "beta_U"
 source("./MC_simu_gamma_estim.R")  # This can take a few seconds
@@ -476,6 +510,7 @@ preprocessed.data <- preprocess.pm2.5.cmr.data(data.folder.name)
 unnormalized.data <- preprocessed.data$unnormalized.data  # Get all unnormalized data
 ```
 
+Figure 11
 ```{r, fig.width = 7.05, fig.height = 4.73}
 # To plot CMR as a function of PM2.5
 # png("images/cmr_data.png", units="in", width=7.05, height=4.73, res=400)
@@ -692,6 +727,7 @@ for (i in 1:n.MC) {
 }
 ```
 
+Figure 12
 ```{r, fig.width = 10, fig.height = 4.54}
 # Colorblind palette
 cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
@@ -723,6 +759,65 @@ ci.data <- rbind(other.qb.df,
                  other.jesson.df4,
                  other.jesson.df5,
                  other.jesson.df6)
+
+ci.data <- ci.data[ci.data$type == "CI", ]
+ci.data[ci.data$method == "Continuous SAIPW-QB", ]$method <- "Proposed method"
+ci.data[ci.data$method == "Jesson et al.", ]$method <- "Jesson et al. (2022)"
+
+CMR.mean <- mean(unnormalized.data$CMR)
+
+#png("images/cmr_sens_anal_without_gamma_50.png", units="in", width=11.44, height=4.73, res=400)  # height=5.44
+cmr.sens.anal.plot <- ggplot(ci.data) +
+  geom_point(data=unnormalized.data, aes(x=PM2.5, y=CMR), color="#EEEEEE") +
+  geom_line(aes(x=dose, y=lb, linetype=method, color=as.factor(gamma))) +
+  geom_line(aes(x=dose, y=ub, linetype=method, color=as.factor(gamma))) +
+  geom_hline(yintercept=CMR.mean, linetype="twodash", color="red", alpha=0.7) +  # yintercept=247
+  theme_linedraw() +
+  scale_color_manual(values=cbp1) +  # colorblind palette
+  scale_linetype_manual(name="Method", values=c("solid", "longdash"), breaks=c("Proposed method", "Jesson et al. (2022)")) +
+  scale_x_continuous(breaks=unique(ci.data$dose),
+                     labels=signif(unique(ci.data$dose), 3),
+                     limits=c(3.27-0.5, 7.98+0.5)) +
+  labs(color=TeX(r"(Sensitivity parameter \Gamma)"), x=TeX(r"($PM_{2.5}$ ($\mu g / m^3$))"), y=TeX(r"(CMR (annual deaths per 100,000 people))")) +
+  annotate("text", x=2.8, y=CMR.mean+8, label=round(CMR.mean, 0), colour="red", alpha=0.7) +
+  theme(axis.title.x=element_text(size=14),
+        axis.title.y=element_text(size=14),
+        axis.text=element_text(size=10),
+        legend.text=element_text(size=11),
+        legend.title=element_text(size=12)) +
+  ylim(100, 430)
+cmr.sens.anal.plot
+#dev.off()
+```
+
+Figure 3
+```{r, fig.width = 10, fig.height = 4.54}
+# Colorblind palette
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#CC79A7", "#0072B2", "#D55E00", "#F0E442")
+
+other.qb.df$gamma <- 1.01
+other.qb.df2$gamma <- 1.25
+other.qb.df3$gamma <- 1.5
+other.qb.df4$gamma <- 2
+other.qb.df5$gamma <- 3
+
+other.jesson.df$gamma <- 1.01
+other.jesson.df2$gamma <- 1.25
+other.jesson.df3$gamma <- 1.5
+other.jesson.df4$gamma <- 2
+other.jesson.df5$gamma <- 3
+
+ci.data <- rbind(other.qb.df,
+                 other.qb.df2,
+                 other.qb.df3,
+                 other.qb.df4,
+                 other.qb.df5,
+                 other.jesson.df,
+                 other.jesson.df2,
+                 other.jesson.df3,
+                 other.jesson.df4,
+                 other.jesson.df5)
 
 ci.data <- ci.data[ci.data$type == "CI", ]
 ci.data[ci.data$method == "Continuous SAIPW-QB", ]$method <- "Proposed method"
