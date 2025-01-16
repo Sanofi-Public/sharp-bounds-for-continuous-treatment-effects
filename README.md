@@ -1,6 +1,15 @@
 # Sharp Bounds for Continuous-Valued Treatment Effects with Unobserved Confounders
 
-## Abstract [(Link to the article)](https://arxiv.org/abs/2411.02231)
+[![arXiv](https://img.shields.io/badge/stat.ME-arXiv%3A2411.02231-B31B1B.svg)](https://arxiv.org/abs/2411.02231)
+
+This repository contains the R implementation of [Sharp Bounds for Continuous-Valued Treatment Effects with Unobserved Confounders](https://arxiv.org/abs/2411.02231).
+
+* [Abstract](#abstract)
+* [Description](#description)
+* [Requirements and Licenses](#requirements-and-licenses)
+* [Output of the `sessionInfo()` command](#output-of-the-sessioninfo-command)
+
+## Abstract
 
 In causal inference, treatment effects are typically estimated under the ignorability, or unconfoundedness, assumption, which is often unrealistic in observational data. By relaxing this assumption and conducting a sensitivity analysis, we introduce novel bounds and derive confidence intervals for the Average Potential Outcome (APO) - a standard metric for evaluating continuous-valued treatment or exposure effects. We demonstrate that these bounds are sharp under a continuous sensitivity model, in the sense that they give the smallest possible interval under this model, and propose a doubly robust version of our estimators. In a comparative analysis with the method of Jesson et al. (2022), using both simulated and real datasets, we show that our approach not only yields sharper bounds but also achieves good coverage of the true APO, with significantly reduced computation times.
 
@@ -22,12 +31,12 @@ This repository is related to the paper *Sharp Bounds for Continuous-Valued Trea
 *Note:* all functions from Jesson et al. (2022) were reimplemented in R, as the original code is in Python. See https://github.com/oatml/overcast.
 
 ### References
-Jesson, Andrew et al. (2022). “Scalable sensitivity and uncertainty analyses for causal-effect estimates of continuous-valued interventions”. In: Advances in Neural Information Processing Systems 35, pp. 13892–13907.
+Jesson, Andrew et al. (2022). “Scalable sensitivity and uncertainty analyses for causal-effect estimates of continuous-valued interventions”. In: Advances in Neural Information Processing Systems 35, pp. 13892–13907. [Link](https://proceedings.neurips.cc/paper_files/paper/2022/hash/5a29c3d172b80bab1238ddc227246c52-Abstract-Conference.html)
 
-Wyatt, Lauren H et al. (2020). “Annual PM2. 5 and cardiovascular mortality rate data: Trends modified by county socioeconomic status in 2,132 US counties”. In: Data in brief 30, p. 105318
+Wyatt, Lauren H et al. (2020). “Annual PM2. 5 and cardiovascular mortality rate data: Trends modified by county socioeconomic status in 2,132 US counties”. In: Data in brief 30, p. 105318. [Link](https://pubmed.ncbi.nlm.nih.gov/32258262/)
 
 ## Requirements and Licenses
-This repository is under a non commercial license (see **LICENSE.txt** file). The following libraries are used in this repository with R version 4.3.2.
+This repository is under a non commercial license (see [LICENSE.txt](./LICENSE.txt) file). The following libraries are used in this repository with R version 4.3.2.
 
 |Library|Version|License|
 |---|---|---|
